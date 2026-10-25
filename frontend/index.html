@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vector DB Research Agent</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231b1b19'/%3E%3Cg stroke='%23f6f5f1' stroke-width='1.5' stroke-linecap='round' opacity='.6'%3E%3Cpath d='M16 16L7 9M16 16L25 8M16 16L26 23M16 16L9 24'/%3E%3C/g%3E%3Cg fill='%23f6f5f1'%3E%3Ccircle cx='7' cy='9' r='2.4'/%3E%3Ccircle cx='25' cy='8' r='2.4'/%3E%3Ccircle cx='26' cy='23' r='2.4'/%3E%3Ccircle cx='9' cy='24' r='2.4'/%3E%3C/g%3E%3Ccircle cx='16' cy='16' r='4' fill='%23e8663a'/%3E%3C/svg%3E">
+<style>
+:root{--bg:#f6f5f1;--card:#fffefb;--text:#1b1b19;--muted:#6f6d66;--line:#dedbd2;--soft:#efede6;--accent:#b8431d;--ok:#2f7d4f;--bad:#b42318;--warn:#a86400;--serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;--mono:ui-monospace,"SF Mono",Consolas,"Liberation Mono",monospace}
+@media (prefers-color-scheme:dark){:root{--bg:#121311;--card:#1a1b18;--text:#ecebe6;--muted:#9c9a92;--line:#2e2f2a;--soft:#22231f;--accent:#ee8a62;--ok:#6cc38d;--bad:#f2766b;--warn:#e0a54a}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button{font:inherit;cursor:pointer;color:inherit}
+.bar{position:sticky;top:0;z-index:20;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 28px;background:var(--bg);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:12px}
+.mark{color:var(--text);flex:none}
+.brand b{font:600 19px var(--serif);letter-spacing:.01em}
+.right{display:flex;align-items:center;gap:8px}
+.health{display:flex;align-items:center;gap:7px;font:12px var(--mono);color:var(--muted);margin-right:8px}
+.health i{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.health.ok i{background:var(--ok)}.health.bad i{background:var(--bad)}
+.btn{border:1px solid var(--text);border-radius:6px;padding:8px 16px;background:var(--text);color:var(--bg);font-weight:500}
+.btn.ghost{background:transparent;color:var(--text);border-color:var(--line)}
+.btn.ghost:hover{border-color:var(--text)}
+.btn.danger{background:var(--bad);border-color:var(--bad);color:#fff}
+.btn:disabled{opacity:.5;cursor:default}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:36px;max-width:1340px;margin:0 auto;padding:0 28px 70px}
+.composer{position:sticky;top:62px;z-index:10;display:flex;gap:10px;padding:20px 0 14px;background:var(--bg)}
+.composer input{flex:1;padding:13px 16px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--text);font:inherit}
+.composer input:focus{outline:none;border-color:var(--text)}
+.composer .btn{padding:0 26px}
+.empty{padding:30px 0 10px;max-width:640px}
+.empty h2{margin:0 0 10px;font:600 34px/1.15 var(--serif)}
+.empty p{margin:0 0 26px;color:var(--muted);font-size:17px}
+.examples{margin:0;padding:0;list-style:none;border-top:1px solid var(--line)}
+.examples li{border-bottom:1px solid var(--line)}
+.eg{display:block;width:100%;text-align:left;background:none;border:0;padding:14px 4px;font-size:16px}
+.eg:hover{color:var(--accent)}
+.eg::before{content:"→";color:var(--accent);margin-right:12px;font-family:var(--mono)}
+.turn{padding-top:26px;margin-top:26px;border-top:1px solid var(--line)}
+.turn:first-child{border-top:0;margin-top:0}
+.label{font:600 11px var(--mono);text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
+.qtitle{margin:6px 0 12px;font:600 26px/1.25 var(--serif);word-break:break-word}
+.status{display:flex;align-items:center;flex-wrap:wrap;gap:10px;font-size:13.5px;color:var(--muted)}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--muted)}
+.status.running .dot{background:var(--accent);animation:blink 1.1s steps(2,start) infinite}
+.status.done .dot{background:var(--ok)}
+.status.error .dot,.status.stopped .dot{background:var(--bad)}
+.status.running .slabel{color:var(--accent)}.status.done .slabel{color:var(--ok)}.status.error .slabel,.status.stopped .slabel{color:var(--bad)}
+.slabel{font-weight:600}
+@keyframes blink{50%{opacity:.2}}
+.link{margin-left:auto;background:none;border:0;color:var(--text);padding:0;text-decoration:underline;text-underline-offset:3px;font-size:13.5px}
+.link:hover{color:var(--accent)}
+.plan{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:2px;counter-reset:s}
+.plan li{counter-increment:s;display:flex;gap:10px;align-items:baseline;padding:4px 0;font-size:14.5px;color:var(--muted)}
+.plan li::before{content:counter(s);width:20px;font:12px var(--mono);color:var(--muted);text-align:right;flex:none}
+.plan li.active{color:var(--text)}.plan li.active::before{color:var(--accent);font-weight:700}
+.plan li.done{color:var(--text)}.plan li.done::before{content:"✓";color:var(--ok)}
+.tool{font:600 12.5px var(--mono);color:var(--accent)}
+.answer{margin-top:20px;font:18px/1.75 var(--serif);max-width:68ch}
+.answer p{margin:0 0 14px}
+.answer ul{margin:0 0 14px;padding-left:24px}
+.answer li{margin-bottom:4px}
+.tools{display:flex;justify-content:flex-end;margin-top:14px}
+.copy{background:none;border:0;padding:0;font-size:13px;color:var(--muted);text-decoration:underline;text-underline-offset:3px}
+.copy:hover{color:var(--accent)}
+.cite{font:700 .62em var(--mono);vertical-align:super;color:var(--accent);margin:0 1px;cursor:pointer;text-decoration:none;letter-spacing:.02em}
+.cite:hover{text-decoration:underline}
+.tbl{overflow-x:auto;margin:18px 0 6px;font-family:system-ui,sans-serif}
+.tbl>b{display:block;margin-bottom:6px;font-size:14px}
+table{border-collapse:collapse;width:100%;font-size:14.5px;line-height:1.5}
+th{text-align:left;font:600 11.5px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:2px solid var(--text);padding:8px 14px 8px 0}
+td{border-bottom:1px solid var(--line);padding:10px 14px 10px 0;vertical-align:top}
+.sources{margin-top:26px;border-top:1px solid var(--line);padding-top:14px}
+.sources h4{margin:0 0 10px;font:600 11px var(--mono);text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
+.src{display:grid;grid-template-columns:34px 1fr;gap:6px;padding:9px 10px;margin:0 -10px;border-radius:6px;font-size:14.5px;transition:background .25s}
+.src.hl{background:color-mix(in srgb,var(--accent) 11%,transparent)}
+.src .id{font:700 12px var(--mono);color:var(--accent);padding-top:3px}
+.src b{font-weight:600}
+.src .loc{font:12px var(--mono);color:var(--muted);word-break:break-all}
+.src a{color:var(--accent)}
+.src .snip{color:var(--muted);margin-top:2px}
+.panel{position:sticky;top:78px;align-self:start;height:calc(100vh - 98px);margin-top:20px;display:flex;flex-direction:column;background:#121417;color:#d6d9de;border-radius:10px;overflow:hidden;border:1px solid #262a30}
+.panel-head{padding:14px 18px;border-bottom:1px solid #262a30}
+.eyebrow{display:block;font:600 11px var(--mono);text-transform:uppercase;letter-spacing:.14em;color:#8a9099}
+#panelTitle{display:block;margin-top:4px;font-size:13.5px;color:#d6d9de;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.timeline{flex:1;overflow:auto;padding:12px 14px 16px;font:12.5px/1.55 var(--mono)}
+.timeline:empty::after{content:"Nothing running. The agent's steps will stream here.";color:#6f757e}
+.row{display:grid;grid-template-columns:42px 52px 1fr;gap:6px;padding:5px 0;border-bottom:1px solid #1b1e23;word-break:break-word}
+.time{color:#5f656e;text-align:right}
+.tag{font-weight:700;letter-spacing:.04em;color:#8a9099}
+.row.step .tag{color:#7aa7ff}.row.plan .tag{color:#7aa7ff}.row.call .tag,.row.ok .tag,.row.done .tag{color:#5fcf8a}
+.row.poor .tag,.row.error .tag{color:#ff7b70}.row.fix .tag{color:#f0b24a}.row.think .tag{color:#6f757e}
+.row.step .msg{color:#fff;font-weight:600}.row.think .msg{color:#8a9099;font-style:italic}
+.row.fix .msg{color:#f4d19a}.row.error .msg{color:#ff9d94}
+.row .tool{color:#f0a37f}
+.row pre{margin:5px 0 0;padding:8px 10px;border-radius:6px;background:#1a1d22;white-space:pre-wrap;max-height:230px;overflow:auto;color:#c4c8cf;font:inherit}
+.row summary{cursor:pointer}
+@media (max-width:980px){.layout{grid-template-columns:1fr;padding:0 16px 40px;gap:0}.panel{position:static;height:auto;max-height:480px;margin-top:30px}.bar{padding:10px 16px}.composer{top:57px}.qtitle{font-size:22px}.empty h2{font-size:28px}.answer{font-size:17px}.right .btn{padding:6px 11px;font-size:14px}.health span{display:none}}
+</style>
+</head>
+<body>
+<header class="bar">
+<div class="brand">
+<svg class="mark" viewBox="0 0 32 32" width="30" height="30" aria-hidden="true">
+<g stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity=".5"><path d="M16 16L7 9M16 16L25 8M16 16L26 23M16 16L9 24"/></g>
+<g fill="currentColor"><circle cx="7" cy="9" r="2.4"/><circle cx="25" cy="8" r="2.4"/><circle cx="26" cy="23" r="2.4"/><circle cx="9" cy="24" r="2.4"/></g>
+<circle cx="16" cy="16" r="4" fill="var(--accent)"/>
+<circle cx="16" cy="29" r="1.8" fill="currentColor" opacity=".3"/>
+</svg>
+<b>Vector DB Research Agent</b>
+</div>
+<div class="right">
+<span class="health" id="health"><i></i><span>checking</span></span>
+<button type="button" id="history" class="btn ghost">History</button>
+<button type="button" id="fresh" class="btn ghost">New session</button>
+</div>
+</header>
+<div class="layout">
+<section>
+<form id="form" class="composer">
+<input id="query" placeholder="Ask a research question..." autocomplete="off" required>
+<button id="ask" class="btn">Ask</button>
+<button type="button" id="stop" class="btn danger" hidden>Stop</button>
+</form>
+<div id="empty" class="empty">
+<h2>Ask about vector databases</h2>
+<p>The agent plans its steps, retrieves from the knowledge base, runs calculations, and cites every source it relies on.</p>
+<ol class="examples" id="examples"></ol>
+</div>
+<div id="runs"></div>
+</section>
+<aside class="panel">
+<div class="panel-head"><span class="eyebrow">Activity log</span><span id="panelTitle">No run selected</span></div>
+<div class="timeline" id="timeline"></div>
+</aside>
+</div>
+<script>
+const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+let sid = localStorage.getItem("sid") || newId();
+localStorage.setItem("sid", sid);
+const $ = id => document.getElementById(id);
+const runs = $("runs"), input = $("query"), askBtn = $("ask"), stopBtn = $("stop"), timeline = $("timeline");
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+const EXAMPLES = [
+  "How much raw memory do 100 million 128-dimensional float32 vectors need?",
+  "Compare pgvector and Qdrant in a table covering indexing, filtering and best fit.",
+  "Which vector database cannot be self-hosted?",
+  "What is the difference between HNSW and IVF?"
+];
+let controller = null, current = null;
+
+$("examples").innerHTML = EXAMPLES.map((q, i) => `<li><button type="button" class="eg" data-i="${i}">${esc(q)}</button></li>`).join("");
+$("examples").onclick = e => {
+  const b = e.target.closest(".eg");
+  if (b && !controller) { input.value = EXAMPLES[b.dataset.i]; $("form").requestSubmit(); }
+};
+
+async function checkHealth() {
+  const h = $("health");
+  try {
+    const r = await fetch("/health");
+    h.className = "health " + (r.ok ? "ok" : "bad");
+    h.lastChild.textContent = r.ok ? "online" : "error";
+  } catch {
+    h.className = "health bad";
+    h.lastChild.textContent = "offline";
+  }
+}
+checkHealth();
+setInterval(checkHealth, 15000);
+
+function inline(s) {
+  return s.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\[(S\d+)\]/g, '<a class="cite" data-id="$1">$1</a>');
+}
+
+function markdown(text) {
+  let html = "", list = false;
+  for (const line of esc(text).split("\n")) {
+    const m = line.match(/^\s*[-*]\s+(.*)/);
+    if (m) {
+      if (!list) { html += "<ul>"; list = true; }
+      html += `<li>${inline(m[1])}</li>`;
+    } else {
+      if (list) { html += "</ul>"; list = false; }
+      if (line.trim()) html += `<p>${inline(line)}</p>`;
+    }
+  }
+  return html + (list ? "</ul>" : "");
+}
+
+function table(data) {
+  if (!Array.isArray(data.columns) || !Array.isArray(data.rows)) return `<div class="tbl"><pre>${esc(JSON.stringify(data, null, 2))}</pre></div>`;
+  const head = data.columns.map(c => `<th>${esc(c)}</th>`).join("");
+  const body = data.rows.map(r => `<tr>${r.map(c => `<td>${inline(esc(c))}</td>`).join("")}</tr>`).join("");
+  return `<div class="tbl"><b>${esc(data.title || "")}</b><table><tr>${head}</tr>${body}</table></div>`;
+}
+
+function newRun(query, live) {
+  $("empty").hidden = true;
+  const el = document.createElement("article");
+  el.className = "turn";
+  el.innerHTML = `<div class="label">Question</div><h2 class="qtitle">${esc(query)}</h2>
+<div class="status running"><span class="dot"></span><span class="slabel">Working <span class="t">0s</span></span><span class="stats"></span><button type="button" class="link">Show activity</button></div>
+<ol class="plan"></ol><div class="final"></div>`;
+  runs.prepend(el);
+  const run = {el, query, live, events: [], status: el.querySelector(".status"), slabel: el.querySelector(".slabel"), stats: el.querySelector(".stats"), plan: el.querySelector(".plan"), start: Date.now(), timer: null, sources: 0};
+  if (live) {
+    run.timer = setInterval(() => {
+      const t = run.slabel.querySelector(".t");
+      if (t) t.textContent = Math.round((Date.now() - run.start) / 1000) + "s";
+    }, 500);
+  }
+  el.querySelector(".link").onclick = () => select(run);
+  return run;
+}
+
+function select(run) {
+  if (current) current.el.classList.remove("selected");
+  current = run;
+  run.el.classList.add("selected");
+  $("panelTitle").textContent = run.query;
+  timeline.innerHTML = "";
+  run.events.forEach(appendTrace);
+}
+
+function row(ev, tag, cls, html) {
+  const d = document.createElement("div");
+  d.className = "row " + cls;
+  d.innerHTML = `<span class="time">${ev.t !== undefined ? ev.t + "s" : ""}</span><span class="tag">${tag}</span><div class="msg">${html}</div>`;
+  timeline.appendChild(d);
+  timeline.scrollTop = timeline.scrollHeight;
+}
+
+function argsView(tool, args) {
+  if (tool === "code_executor" && args && args.code) return `<pre>${esc(args.code)}</pre>`;
+  return `<pre>${esc(JSON.stringify(args))}</pre>`;
+}
+
+function appendTrace(ev) {
+  if (ev.type === "plan") row(ev, "PLAN", "plan", `${ev.steps.length} steps: ` + ev.steps.map(s => `<span class="tool">${esc(s.tool)}</span>`).join(" → "));
+  else if (ev.type === "step") row(ev, "STEP", "step", `${ev.index}. ${esc(ev.goal)}`);
+  else if (ev.type === "thought") { if (ev.text) row(ev, "THINK", "think", esc(ev.text)); }
+  else if (ev.type === "tool_call") row(ev, "CALL", "call", `<span class="tool">${esc(ev.tool)}</span>${argsView(ev.tool, ev.args)}`);
+  else if (ev.type === "tool_result") row(ev, ev.good ? "OK" : "POOR", ev.good ? "ok" : "poor", `<details ${ev.good ? "" : "open"}><summary>${esc(ev.tool)} returned ${ev.good ? "a result" : "a poor result"}</summary><pre>${esc(ev.observation)}</pre></details>`);
+  else if (ev.type === "reflection") row(ev, "FIX", "fix", `${esc(ev.text)}<br>retry with <span class="tool">${esc(ev.tool)}</span>${argsView(ev.tool, ev.args)}`);
+  else if (ev.type === "error") row(ev, "ERROR", "error", esc(ev.message));
+  else if (ev.type === "final") row(ev, "DONE", "done", "Answer ready");
+}
+
+function finish(run, state, label) {
+  clearInterval(run.timer);
+  run.status.className = "status " + state;
+  run.slabel.textContent = label;
+  run.plan.querySelectorAll("li").forEach(li => { li.classList.remove("active"); if (state === "done") li.classList.add("done"); });
+  const calls = run.events.filter(e => e.type === "tool_call").length;
+  const fixes = run.events.filter(e => e.type === "reflection").length;
+  const n = (k, w) => `${k} ${w}${k === 1 ? "" : "s"}`;
+  const parts = [n(calls, "tool call"), n(fixes, "self-correction"), n(run.sources, "source")];
+  if (run.live) parts.push(Math.round((Date.now() - run.start) / 1000) + "s");
+  run.stats.textContent = parts.join(" · ");
+}
+
+function renderFinal(run, ev) {
+  const map = Object.fromEntries((ev.sources || []).map(s => [s.id, s]));
+  run.sources = (ev.sources || []).length;
+  const sources = (ev.sources || []).map(s => {
+    const loc = /^https?:/.test(s.location) ? `<a href="${esc(s.location)}" target="_blank" rel="noopener">${esc(s.location)}</a>` : esc(s.location);
+    return `<div class="src" data-id="${s.id}"><span class="id">${s.id}</span><div><b>${esc(s.title)}</b><div class="loc">${loc}</div><div class="snip">${esc(s.text.slice(0, 200))}...</div></div></div>`;
+  }).join("");
+  const box = run.el.querySelector(".final");
+  box.innerHTML = `<div class="answer">${markdown(ev.answer)}${(ev.structured || []).map(table).join("")}</div>
+<div class="tools"><button class="copy" type="button">Copy answer</button></div>
+<div class="sources"><h4>Sources</h4>${sources || '<div class="snip">No sources cited.</div>'}</div>`;
+  box.querySelectorAll(".cite").forEach(a => {
+    a.title = map[a.dataset.id] ? map[a.dataset.id].title : "";
+    a.onclick = () => {
+      box.querySelectorAll(".src").forEach(s => {
+        const hit = s.dataset.id === a.dataset.id;
+        s.classList.toggle("hl", hit);
+        if (hit) s.scrollIntoView({behavior: "smooth", block: "nearest"});
+      });
+    };
+  });
+  box.querySelector(".copy").onclick = e => {
+    navigator.clipboard.writeText(ev.answer).then(() => { e.target.textContent = "Copied"; setTimeout(() => e.target.textContent = "Copy answer", 1500); });
+  };
+}
+
+function handle(run, ev) {
+  if (run.live) ev.t = ((Date.now() - run.start) / 1000).toFixed(1);
+  run.events.push(ev);
+  if (ev.type === "plan") {
+    run.plan.innerHTML = ev.steps.map(s => `<li><span><span class="tool">${esc(s.tool)}</span> ${esc(s.goal)}</span></li>`).join("");
+  } else if (ev.type === "step") {
+    run.plan.querySelectorAll("li").forEach((li, i) => { li.classList.toggle("done", i < ev.index - 1); li.classList.toggle("active", i === ev.index - 1); });
+  } else if (ev.type === "error") {
+    finish(run, "error", "Failed");
+  } else if (ev.type === "final") {
+    renderFinal(run, ev);
+    finish(run, "done", "Done");
+  }
+  if (run === current) appendTrace(ev);
+}
+
+function setBusy(busy) {
+  askBtn.hidden = busy;
+  stopBtn.hidden = !busy;
+  input.disabled = busy;
+}
+
+$("form").onsubmit = async e => {
+  e.preventDefault();
+  const query = input.value.trim();
+  if (!query || controller) return;
+  input.value = "";
+  controller = new AbortController();
+  setBusy(true);
+  const run = newRun(query, true);
+  select(run);
+  try {
+    const res = await fetch("/run", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({query, session_id: sid}), signal: controller.signal});
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const reader = res.body.getReader(), dec = new TextDecoder();
+    let buf = "";
+    for (;;) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, {stream: true});
+      let i;
+      while ((i = buf.indexOf("\n\n")) >= 0) {
+        const chunk = buf.slice(0, i);
+        buf = buf.slice(i + 2);
+        if (chunk.startsWith("data: ")) handle(run, JSON.parse(chunk.slice(6)));
+      }
+    }
+    if (run.status.classList.contains("running")) finish(run, "error", "Ended early");
+  } catch (err) {
+    if (err.name === "AbortError") finish(run, "stopped", "Stopped");
+    else handle(run, {type: "error", message: err.message});
+  }
+  controller = null;
+  setBusy(false);
+  input.focus();
+};
+
+stopBtn.onclick = () => controller && controller.abort();
+
+function reset() {
+  runs.innerHTML = "";
+  timeline.innerHTML = "";
+  current = null;
+  $("panelTitle").textContent = "No run selected";
+  $("empty").hidden = false;
+}
+
+$("fresh").onclick = () => {
+  if (controller) return;
+  sid = newId();
+  localStorage.setItem("sid", sid);
+  reset();
+};
+
+$("history").onclick = async () => {
+  if (controller) return;
+  const data = await (await fetch("/history/" + sid)).json();
+  reset();
+  let last = null;
+  data.runs.forEach(r => {
+    const run = newRun(r.query, false);
+    r.events.forEach(ev => handle(run, ev));
+    if (run.status.classList.contains("running")) finish(run, "error", "Incomplete");
+    last = run;
+  });
+  if (last) select(last);
+};
+</script>
+</body>
+</html>
